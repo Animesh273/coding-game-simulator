@@ -124,13 +124,20 @@ For deployment, set **Proxy base URL** in AI Settings to a small backend you con
 
 ## Deploying
 
-Pushing to `main` triggers [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it typechecks, runs the full smoke suite, builds, and publishes to GitHub Pages. **A broken game never reaches the published site** — the deploy job depends on `npm run check` passing.
+Deployed on **Vercel**. It auto-detects Vite, so no `vercel.json` is needed:
 
-One-time setup in the repo: **Settings → Pages → Source → GitHub Actions**.
+| Setting | Value |
+|---|---|
+| Framework preset | Vite |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Install command | `npm install` |
 
-The site is served from `/coding-game-simulator/`, which `vite.config.ts` sets as `base` for production builds only (dev stays on `/`). If you rename the repo, change that one line.
+Every push to `main` triggers a redeploy.
 
-**No secret is needed and none should be added.** The build contains no API key — the mentor uses bring-your-own-key, stored per-visitor in their own browser. Do not add an `ANTHROPIC_API_KEY` repository secret for this workflow; a static site cannot keep one private.
+**`base` must stay `/` in `vite.config.ts`.** Vercel serves from the domain root. A sub-path base (`'/repo-name/'`, which GitHub Pages needs) makes every asset request 404 and the page render blank with no console error to explain it — the HTML loads fine, it just points at URLs that do not exist.
+
+**No environment variable is needed, and no API key should ever be added.** The mentor is bring-your-own-key, stored per visitor in their own browser. A static build cannot keep a secret: anything you put in an env var here is readable by every visitor in the shipped JavaScript. If you want visitors to get AI without their own key, that requires a serverless function holding the key server-side — a different architecture, not a config change.
 
 ## Verifying it
 

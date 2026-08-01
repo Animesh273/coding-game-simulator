@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [react()],
   /**
-   * GitHub Pages serves a project repo from /<repo-name>/, so the production
-   * build needs that prefix on every asset URL. Dev keeps '/' so localhost
-   * still works unprefixed.
+   * Vercel serves the site from the domain root, so assets must be referenced
+   * from '/'. (A sub-path base such as '/repo-name/' is only needed by hosts
+   * that serve a project under a folder — GitHub Pages does, Vercel does not.
+   * Setting one here makes every asset 404 and the page render blank.)
    */
-  base: command === 'build' ? '/coding-game-simulator/' : '/',
+  base: '/',
   server: { port: 5173, open: false },
-}))
+})

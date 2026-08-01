@@ -70,7 +70,7 @@ export function WorldMap({ onEnterWorld }: { onEnterWorld: (id: WorldId) => void
       </div>
 
       <h2 className="screen-title">Learning Worlds</h2>
-      <p className="screen-sub">Eight realms between you and an offer letter.</p>
+      <p className="screen-sub">{WORLDS.length} realms between you and an offer letter.</p>
 
       <div className="map">
         {WORLDS.map((w, idx) => {
