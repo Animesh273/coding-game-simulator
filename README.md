@@ -132,12 +132,20 @@ Four modes, resolved automatically in this order:
 
 ### Server-side AI (`api/chat.ts`)
 
-Set **one** of these in Vercel → Settings → Environment Variables and redeploy:
+**Free by default. It cannot bill you unless you explicitly opt in.**
+
+With no variable set the endpoint makes no upstream call at all — it returns 501 and the client uses the authored coach. The deployment costs nothing.
 
 ```
-GROQ_API_KEY=gsk_...        # recommended — free tier, no card
-ANTHROPIC_API_KEY=sk-ant-... # higher quality, paid per token
+GROQ_API_KEY=gsk_...          # free tier, no card. Over quota it 429s. Cannot bill you.
+
+ANTHROPIC_API_KEY=sk-ant-...  # billed per token, PER VISITOR, no natural ceiling
+AI_ALLOW_PAID=true            # ...and ignored entirely without this second switch
 ```
+
+The `AI_ALLOW_PAID` gate exists so a key pasted in by habit — or inherited from another project on the same Vercel account — can never start charging silently. If both keys are present, Groq wins: the deployment should never reach for the one that bills.
+
+**A visitor's own key never costs you anything**, whichever provider they choose. Server-side is the only mode you pay for.
 
 These are **not** `VITE_` prefixed, so they stay on the server and never reach the bundle. That is the whole point: it is the only way a static site can offer AI without shipping a spendable credential.
 

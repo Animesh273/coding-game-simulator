@@ -9,9 +9,20 @@
  * Supports Groq (OpenAI-compatible) and Anthropic, and normalises both into a
  * single plain-text stream so the browser never has to parse two SSE dialects.
  *
- * Configure exactly one of these in Vercel → Settings → Environment Variables:
- *   GROQ_API_KEY       (recommended — generous free tier, very fast)
- *   ANTHROPIC_API_KEY  (higher quality, paid per token)
+ * ── Cost posture: free by default, paid only on explicit opt-in ─────────
+ * With no environment variable set this endpoint makes NO upstream call at
+ * all — it returns 501 and the client falls back to the authored coach. The
+ * deployment costs nothing.
+ *
+ *   GROQ_API_KEY       Free tier, no card. Over quota it returns 429 and the
+ *                      client quietly uses the offline coach. Cannot bill you.
+ *
+ *   ANTHROPIC_API_KEY  Billed per token, per visitor, with no natural ceiling.
+ *                      Deliberately IGNORED unless AI_ALLOW_PAID=true is also
+ *                      set, so a key pasted in by habit — or inherited from
+ *                      another project on the same Vercel account — can never
+ *                      start charging silently.
+ * ────────────────────────────────────────────────────────────────────────
  */
 
 export const config = { runtime: 'edge' }
@@ -46,10 +57,20 @@ interface ChatRequest {
   tier?: Tier
 }
 
+/** Paid providers require a second, explicit switch. Free ones do not. */
+const PAID_ENABLED = process.env.AI_ALLOW_PAID === 'true'
+
 function provider(): 'groq' | 'anthropic' | null {
+  // Groq first and unconditionally: it is the free tier, so if both keys are
+  // present the deployment should never reach for the one that bills.
   if (process.env.GROQ_API_KEY) return 'groq'
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
+  if (process.env.ANTHROPIC_API_KEY && PAID_ENABLED) return 'anthropic'
   return null
+}
+
+/** True when the active provider cannot generate a bill. */
+function isFreeTier(which: 'groq' | 'anthropic'): boolean {
+  return which === 'groq'
 }
 
 function json(body: unknown, status: number) {
@@ -65,13 +86,28 @@ export default async function handler(req: Request): Promise<Response> {
   // Health probe — lets the client discover whether server-side AI exists
   // without burning a request or leaking which key is configured.
   if (req.method === 'GET') {
-    return json({ available: which !== null, provider: which }, 200)
+    return json(
+      {
+        available: which !== null,
+        provider: which,
+        free: which ? isFreeTier(which) : true,
+        // Surfaced so the settings screen can warn if a paid key is live.
+        paidEnabled: PAID_ENABLED,
+      },
+      200,
+    )
   }
 
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   if (!which) {
+    const blocked = Boolean(process.env.ANTHROPIC_API_KEY) && !PAID_ENABLED
     return json(
-      { error: 'No AI key is configured on this deployment.', code: 'not_configured' },
+      {
+        error: blocked
+          ? 'A paid AI key is present but disabled. Set AI_ALLOW_PAID=true to enable it — note that it bills per visitor.'
+          : 'No AI key is configured on this deployment.',
+        code: 'not_configured',
+      },
       501,
     )
   }
