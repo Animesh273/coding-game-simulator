@@ -164,17 +164,6 @@ export function isSkillUnlocked(skillId: string, mastery: Record<string, Mastery
   return node.requires.every((r) => masteryPercent(mastery[r] ?? emptyMastery()) >= UNLOCK_THRESHOLD)
 }
 
-/**
- * Restricts a pool to skills the tree has actually opened.
- *
- * Falls back to the unfiltered pool if that would leave nothing — better to
- * serve something slightly ahead of the student than to dead-end them.
- */
-function unlockedOnly(pool: Question[], mastery: Record<string, Mastery>): Question[] {
-  const filtered = pool.filter((q) => isSkillUnlocked(q.skill, mastery))
-  return filtered.length > 0 ? filtered : pool
-}
-
 export function countUnlockedSkills(mastery: Record<string, Mastery>): number {
   return Object.keys(SKILL_BY_ID).filter((id) => isSkillUnlocked(id, mastery)).length
 }
@@ -361,16 +350,17 @@ export const useGame = create<GameState>()(
           pool = due.map((c) => QUESTION_BY_ID[c.qid]).filter(Boolean)
           target = Math.min(12, Math.max(1, pool.length))
         } else if (mode === 'timed') {
-          pool = unlockedOnly(world ? questionsForWorld(world) : ALL_QUESTIONS, s.mastery)
+          pool = world ? questionsForWorld(world) : ALL_QUESTIONS
           target = 12
           timeLimit = 25
         } else {
-          // An explicitly chosen skill is already gated by the tree UI; a
-          // world-wide run must respect the tree itself, or the locks are
-          // decorative and the tracker shows progress on locked topics.
-          pool = skill
-            ? questionsForSkill(skill)
-            : unlockedOnly(world ? questionsForWorld(world) : ALL_QUESTIONS, s.mastery)
+          // Deliberately NOT filtered to unlocked skills. Doing so was measured
+          // to starve the pool: by the third Python run the unlocked subset was
+          // exhausted (9 of 10 questions repeated) while unseen material sat
+          // behind locked nodes. The skill tree still gates *direct* node
+          // selection; a world-wide run is allowed to range ahead of it, and
+          // not repeating questions matters more than the lock being total.
+          pool = skill ? questionsForSkill(skill) : world ? questionsForWorld(world) : ALL_QUESTIONS
           target = Math.min(10, Math.max(4, pool.length))
         }
 
@@ -570,8 +560,8 @@ export const useGame = create<GameState>()(
         if (run.mode === 'boss' && run.companyId) pool = questionsForWorlds(COMPANY_BY_ID[run.companyId].focus)
         else if (run.mode === 'revision') pool = dueCards(s.srs, Date.now()).map((c) => QUESTION_BY_ID[c.qid]).filter(Boolean)
         else if (run.skill) pool = questionsForSkill(run.skill)
-        else if (run.world) pool = unlockedOnly(questionsForWorld(run.world), s.mastery)
-        else pool = unlockedOnly(ALL_QUESTIONS, s.mastery)
+        else if (run.world) pool = questionsForWorld(run.world)
+        else pool = ALL_QUESTIONS
 
         const next = selectQuestion({
           pool,

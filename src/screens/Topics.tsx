@@ -199,17 +199,22 @@ export function TopicsPanel() {
                       style={{ padding: '11px 14px', gap: 12, borderBottom: '1px solid rgba(255,255,255,.04)' }}
                     >
                       <div className="row" style={{ gap: 10, minWidth: 0, flex: 1 }}>
-                        <span style={{ fontSize: 17, opacity: s.unlocked ? 1 : 0.35 }}>
-                          {s.unlocked ? s.node.icon : '🔒'}
+                        {/* A padlock only means "you have never been served
+                            this". World-wide runs range ahead of the tree, so a
+                            topic you've already met must not look locked. */}
+                        <span style={{ fontSize: 17, opacity: s.unlocked || s.seen > 0 ? 1 : 0.35 }}>
+                          {s.unlocked || s.seen > 0 ? s.node.icon : '🔒'}
                         </span>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div className="small bold" style={{ opacity: s.unlocked ? 1 : 0.5 }}>
+                          <div className="small bold" style={{ opacity: s.unlocked || s.seen > 0 ? 1 : 0.5 }}>
                             {s.node.name}
                           </div>
                           <div className="tiny faint" style={{ marginBottom: 5 }}>
                             {s.seen === 0
                               ? `Not started · ${s.total} question${s.total === 1 ? '' : 's'} available`
-                              : `${s.seen}/${s.total} seen · ${s.correct}/${s.attempts} correct`}
+                              : `${s.seen}/${s.total} seen · ${s.correct}/${s.attempts} correct${
+                                  s.unlocked ? '' : ' · node opens at 35% of its prerequisite'
+                                }`}
                           </div>
                           <Bar value={s.coverage} thin color={s.seen === 0 ? 'rgba(255,255,255,.12)' : wash} />
                         </div>

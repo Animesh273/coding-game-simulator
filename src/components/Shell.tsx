@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useGame, DAILY_GOAL_XP, type GameEvent } from '../state/store'
 import { levelFromXp, rankFromLevel, CHEST_LABEL, CHEST_COLOR } from '../game/progression'
 import { claimableCount } from '../game/quests'
-import { ACHIEVEMENT_BY_ID, TIER_COLOR } from '../game/achievements'
+import { ACHIEVEMENT_BY_ID } from '../game/achievements'
 import { Avatar, Modal, Confetti, CountUp } from './common'
 import { sfx } from '../lib/sfx'
 import { dueCards } from '../game/adaptive'
@@ -144,17 +144,18 @@ export function EventLayer() {
   const dismissEvent = useGame((s) => s.dismissEvent)
   const openChest = useGame((s) => s.openChest)
   const pendingChests = useGame((s) => s.pendingChests)
-  const midRun = useGame((s) => s.run !== null && !s.run.finished)
-
   /**
-   * Achievements fire in clusters early on — two landed on the very first
-   * question in testing, which meant two full-screen dismissals before the
-   * student could answer the second one. Mid-run they demote to toasts so the
-   * "just one more question" loop is never interrupted; level-ups keep the
-   * modal because they're rarer and they're the headline beat.
+   * Achievements are always toasts; only level-ups and chests block.
+   *
+   * They fire in clusters — two landed on the very first question in testing —
+   * so a modal each meant two full-screen dismissals before the student could
+   * answer question two. An earlier attempt demoted them *only while a run was
+   * active*, which was worse: the classification flipped when the run ended, so
+   * queued toasts were re-promoted into modals stacked on top of the results
+   * screen. Deciding purely by event type keeps it stable regardless of game
+   * state. The Badges panel is where you savour them.
    */
-  const isBlocking = (e: GameEvent) =>
-    e.type === 'levelup' || e.type === 'chest' || (e.type === 'achievement' && !midRun)
+  const isBlocking = (e: GameEvent) => e.type === 'levelup' || e.type === 'chest'
 
   const blocking = events.find(isBlocking)
   const toasts = events.filter((e) => !isBlocking(e))
@@ -210,22 +211,6 @@ export function EventLayer() {
           </div>
           <button className="btn primary block" onClick={() => dismissEvent(blocking.id)}>
             Keep going
-          </button>
-        </Modal>
-      )}
-
-      {blocking?.type === 'achievement' && (
-        <Modal onClose={() => dismissEvent(blocking.id)}>
-          <div className="rays" />
-          <Confetti count={22} />
-          <div className="modal-emoji">{ACHIEVEMENT_BY_ID[blocking.achievementId]?.icon ?? '🏅'}</div>
-          <div className="tiny bold" style={{ letterSpacing: 2, color: TIER_COLOR[ACHIEVEMENT_BY_ID[blocking.achievementId]?.tier ?? 'bronze'] }}>
-            ACHIEVEMENT UNLOCKED
-          </div>
-          <div className="modal-title">{ACHIEVEMENT_BY_ID[blocking.achievementId]?.name}</div>
-          <div className="modal-sub">{ACHIEVEMENT_BY_ID[blocking.achievementId]?.desc}</div>
-          <button className="btn primary block" onClick={() => dismissEvent(blocking.id)}>
-            Nice
           </button>
         </Modal>
       )}

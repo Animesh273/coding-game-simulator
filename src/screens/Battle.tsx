@@ -333,7 +333,10 @@ export function Battle({ onExit }: { onExit: () => void }) {
           <DifficultyDots level={q.difficulty} />
         </div>
 
-        <div className="qprompt">{q.prompt}</div>
+        {/* Prompts use `backticks` for identifiers, same as explanations. */}
+        <div className="qprompt">
+          <RichText text={q.prompt} />
+        </div>
         {q.code && <pre className="qcode">{q.code}</pre>}
         {isMulti && <div className="tiny faint mt">Select all that apply, then submit.</div>}
 
@@ -352,7 +355,9 @@ export function Battle({ onExit }: { onExit: () => void }) {
             return (
               <button key={i} className={cls} onClick={() => choose(i)} disabled={!!answered}>
                 <span className="key">{answered && isAnswer ? '✓' : i + 1}</span>
-                <span style={{ flex: 1 }}>{c}</span>
+                <span style={{ flex: 1 }}>
+                  <RichText text={c} />
+                </span>
               </button>
             )
           })}

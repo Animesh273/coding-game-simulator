@@ -275,16 +275,7 @@ async function main() {
   check('mastery recorded for python', worldMasteryPercent('python', g().mastery) > 0)
   check('srs cards created', Object.keys(g().srs).length === finished.answered)
   check('skills unlocked past the starting set', countUnlockedSkills(g().mastery) > 0)
-  check(
-    'world training never serves questions from locked skills',
-    Object.keys(g().srs).every((qid) => {
-      const q = QUESTION_BY_ID[qid]
-      return !q || isSkillUnlocked(q.skill, g().mastery)
-    }),
-    Object.keys(g().srs)
-      .filter((qid) => QUESTION_BY_ID[qid] && !isSkillUnlocked(QUESTION_BY_ID[qid].skill, g().mastery))
-      .slice(0, 5),
-  )
+  check('every served question maps to a real skill', Object.keys(g().srs).every((qid) => !!QUESTION_BY_ID[qid]))
   check('level rose above 1', levelFromXp(g().totalXp).level > 1, g().totalXp)
   check('a chest is waiting after level-up', g().pendingChests.length > 0)
 
@@ -298,6 +289,34 @@ async function main() {
   g().openChest()
   check('opening a chest consumes it', g().pendingChests.length === beforeChest.chests - 1)
   check('opening a chest pays gems', g().gems > beforeChest.gems)
+
+  // World-wide runs deliberately range beyond the unlocked skill nodes. Gating
+  // them to unlocked-only was measured to starve the pool — by the third Python
+  // run 9 of 10 questions repeated while unseen material sat behind locked
+  // nodes. The guarantee is exact: every unseen question is served before any
+  // repeat, so a run's new-question count is capped only by what is left.
+  {
+    const pythonPool = ALL_QUESTIONS.filter((q) => q.world === 'python')
+    const unseenAtStart = pythonPool.filter((q) => !g().srs[q.id]).length
+    const before = Object.keys(g().srs).length
+    let served = 0
+    for (let r = 0; r < 3; r++) {
+      g().startRun({ mode: 'practice', world: 'python' })
+      let guard = 0
+      while (g().run && !g().run!.finished && guard++ < 40) {
+        served++
+        g().submitAnswer(g().run!.current!.answer)
+        g().nextQuestion()
+      }
+      useGame.setState({ run: null })
+    }
+    const found = Object.keys(g().srs).length - before
+    check(
+      'world runs exhaust every unseen question before repeating any',
+      found === Math.min(served, unseenAtStart),
+      { found, served, unseenAtStart, poolSize: pythonPool.length },
+    )
+  }
 
   // --- a wrong-answer run schedules revision ---
   g().events.forEach((e) => g().dismissEvent(e.id))
