@@ -76,11 +76,19 @@ This is the mechanic that turns "every mistake becomes a learning opportunity" f
 
 Worlds: 🐍 Python World · ⚡ C++ Arena · ⚔️ DSA Kingdom · 🗄️ SQL City · 🏔️ OS Mountain · 🌐 Networking Island · 💎 DBMS Depths · 🎯 Aptitude Arena · 🎙️ The HR Hall
 
-### Never the same question twice
+### Never the same question twice — until the pool runs out
 
-The selection engine strongly prefers material you have never been served: an unseen-question bonus that outweighs every other scoring term combined, plus a recency penalty that decays over 24 hours. Two back-to-back runs over the same world share **zero** questions. Once a pool is genuinely exhausted, repeats are ordered least-recently-seen first rather than by whatever happened to fit best.
+The selection engine strongly prefers material you have never been served: an unseen-question bonus that outweighs every other scoring term combined, plus a recency penalty that decays over 24 hours. Two back-to-back runs over the same world share **zero** questions, and once a pool is exhausted repeats are ordered least-recently-seen first.
 
-World-wide training also respects the skill tree — a locked node's questions are never served, so the tree actually gates content instead of decorating it.
+**The honest limit is content, not the engine.** Python has 24 questions and a run serves 10, so around the third consecutive run in one world repeats become arithmetic rather than a bug. More questions is the only real fix — and adding one is appending an object to a file in `src/content/questions/`, which the smoke suite then validates.
+
+### Learn, then practise
+
+ASCEND started as test-only: you could be *quizzed* on a topic and read a post-mortem, but never actually **taught** it. Lessons close that gap.
+
+Each lesson is paged one section at a time — concept, worked code, and a callout flagged as a **tip**, a **common trap**, or **in an interview**. The last page is a summary of key points plus a one-click *"Practise this now"* that starts a run on the same skill node with the material fresh. Finishing one pays XP and gems, once.
+
+**13 lessons** cover both language tracks end to end — all 7 Python nodes and all 6 C++ nodes. The supporting worlds have questions but no lessons yet; the UI keys off that, so a node without one simply offers practice rather than advertising a page that doesn't exist. Adding a lesson is appending one object to a file in `src/content/lessons/`.
 
 ### Topics tracker
 

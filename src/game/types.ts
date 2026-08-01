@@ -49,6 +49,39 @@ export interface Question {
   tags?: string[]
 }
 
+/* ------------------------------------------------------------- lessons -- */
+
+export type CodeLang = 'python' | 'cpp' | 'sql' | 'text'
+
+export interface LessonSection {
+  heading: string
+  /** Markdown-lite: **bold**, `code`, _italics_. Blank lines separate paragraphs. */
+  body: string
+  code?: string
+  lang?: CodeLang
+  /** Optional highlighted aside rendered after the body. */
+  callout?: { kind: 'tip' | 'trap' | 'interview'; text: string }
+}
+
+/**
+ * A teachable unit, one per skill node.
+ *
+ * The game was originally test-only: you could be quizzed on a topic and read
+ * a post-mortem, but never actually taught it. Lessons close that gap — read
+ * first, then practise the same node with the questions already loaded.
+ */
+export interface Lesson {
+  skillId: string
+  title: string
+  /** Rough reading time, shown up front so it feels bounded. */
+  minutes: number
+  intro: string
+  sections: LessonSection[]
+  keyPoints: string[]
+  /** How this specific topic tends to surface in an interview. */
+  interviewAngle: string
+}
+
 export interface SkillNode {
   id: string
   world: WorldId

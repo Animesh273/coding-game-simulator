@@ -12,7 +12,7 @@ import type { AvatarPart } from '../game/avatar'
 
 type Panel = 'stats' | 'topics' | 'badges' | 'locker'
 
-export function Profile() {
+export function Profile({ onLearn }: { onLearn: (skillId: string) => void }) {
   const [panel, setPanel] = useState<Panel>('stats')
 
   return (
@@ -42,7 +42,7 @@ export function Profile() {
       </div>
 
       {panel === 'stats' && <Stats />}
-      {panel === 'topics' && <TopicsPanel />}
+      {panel === 'topics' && <TopicsPanel onLearn={onLearn} />}
       {panel === 'badges' && <Badges />}
       {panel === 'locker' && <Locker />}
     </div>

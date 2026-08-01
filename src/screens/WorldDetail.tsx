@@ -3,6 +3,7 @@ import { useGame, isSkillUnlocked, worldMasteryPercent } from '../state/store'
 import { WORLD_BY_ID } from '../content/worlds'
 import { masteryPercent, masteryBadge, emptyMastery, recommendedDifficulty } from '../game/adaptive'
 import { questionsForSkill } from '../content/questions'
+import { lessonFor } from '../content/lessons'
 import { Bar, Modal, DifficultyDots } from '../components/common'
 import { sfx } from '../lib/sfx'
 import type { WorldId, SkillNode } from '../game/types'
@@ -10,10 +11,19 @@ import type { WorldId, SkillNode } from '../game/types'
 const COL = 152
 const ROW = 104
 
-export function WorldDetail({ world, onBack }: { world: WorldId; onBack: () => void }) {
+export function WorldDetail({
+  world,
+  onBack,
+  onLearn,
+}: {
+  world: WorldId
+  onBack: () => void
+  onLearn: (skillId: string) => void
+}) {
   const w = WORLD_BY_ID[world]
   const mastery = useGame((s) => s.mastery)
   const startRun = useGame((s) => s.startRun)
+  const lessonsRead = useGame((s) => s.lessonsRead)
   const [selected, setSelected] = useState<SkillNode | null>(null)
 
   const wash = `linear-gradient(135deg, ${w.hue[0]}, ${w.hue[1]})`
@@ -111,7 +121,25 @@ export function WorldDetail({ world, onBack }: { world: WorldId; onBack: () => v
                   }}
                   disabled={!unlocked}
                 >
-                  <div className="tree-icon">{unlocked ? node.icon : '🔒'}</div>
+                  <div className="tree-icon" style={{ position: 'relative' }}>
+                    {unlocked ? node.icon : '🔒'}
+                    {/* Unread-lesson dot — the tree should advertise where
+                        there is something to read, not just something to grind. */}
+                    {unlocked && lessonFor(node.id) && !lessonsRead.includes(node.id) && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: -2,
+                          right: 'calc(50% - 26px)',
+                          fontSize: 11,
+                          filter: 'drop-shadow(0 0 5px #c58cff)',
+                        }}
+                        title="Lesson available"
+                      >
+                        📖
+                      </span>
+                    )}
+                  </div>
                   <div className="tree-name">{node.name}</div>
                   <Bar value={pct} thin color={wash} />
                   <div className="tiny" style={{ marginTop: 4, color: badge.color, fontWeight: 700 }}>
@@ -127,14 +155,24 @@ export function WorldDetail({ world, onBack }: { world: WorldId; onBack: () => v
         </div>
       </div>
 
-      {selected && <SkillModal node={selected} onClose={() => setSelected(null)} />}
+      {selected && <SkillModal node={selected} onClose={() => setSelected(null)} onLearn={onLearn} />}
     </div>
   )
 }
 
-function SkillModal({ node, onClose }: { node: SkillNode; onClose: () => void }) {
+function SkillModal({
+  node,
+  onClose,
+  onLearn,
+}: {
+  node: SkillNode
+  onClose: () => void
+  onLearn: (skillId: string) => void
+}) {
   const mastery = useGame((s) => s.mastery)
   const startRun = useGame((s) => s.startRun)
+  const lessonRead = useGame((s) => s.lessonsRead.includes(node.id))
+  const lesson = lessonFor(node.id)
   const m = mastery[node.id] ?? emptyMastery()
   const pct = masteryPercent(m)
   const badge = masteryBadge(pct)
@@ -165,10 +203,27 @@ function SkillModal({ node, onClose }: { node: SkillNode; onClose: () => void })
         </div>
       </div>
 
-      <div className="tiny faint mb">{pool.length} questions in this node</div>
+      <div className="tiny faint mb">
+        {pool.length} questions{lesson ? ` · ${lesson.minutes} min lesson` : ' · no lesson yet'}
+      </div>
+
+      {/* Learn first, then practise — the order the student should follow, and
+          the order the buttons are in. */}
+      {lesson && (
+        <button
+          className={`btn ${lessonRead ? 'ghost' : 'primary'} block mb`}
+          onClick={() => {
+            sfx.click()
+            onLearn(node.id)
+            onClose()
+          }}
+        >
+          📖 {lessonRead ? 'Re-read the lesson' : `Learn ${node.name}`}
+        </button>
+      )}
 
       <button
-        className="btn primary block"
+        className={`btn ${lesson && !lessonRead ? 'ghost' : 'primary'} block`}
         disabled={pool.length === 0}
         onClick={() => {
           sfx.click()
@@ -176,7 +231,7 @@ function SkillModal({ node, onClose }: { node: SkillNode; onClose: () => void })
           onClose()
         }}
       >
-        {pool.length === 0 ? 'No questions yet' : `Train ${node.name}`}
+        {pool.length === 0 ? 'No questions yet' : `⚔️ Train ${node.name}`}
       </button>
     </Modal>
   )

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useGame, isSkillUnlocked } from '../state/store'
 import { WORLDS } from '../content/worlds'
 import { questionsForSkill, QUESTION_COUNT } from '../content/questions'
+import { hasLesson, LESSON_COUNT } from '../content/lessons'
 import { masteryPercent, masteryBadge, emptyMastery } from '../game/adaptive'
 import { Bar } from '../components/common'
 import { sfx } from '../lib/sfx'
@@ -33,9 +34,10 @@ const FOCUS_COLOR: Record<WorldFocus, string> = {
 type Filter = 'all' | WorldFocus
 
 /** Rendered as a panel inside Profile, so it brings no screen chrome of its own. */
-export function TopicsPanel() {
+export function TopicsPanel({ onLearn }: { onLearn: (skillId: string) => void }) {
   const mastery = useGame((s) => s.mastery)
   const srs = useGame((s) => s.srs)
+  const lessonsRead = useGame((s) => s.lessonsRead)
   const [filter, setFilter] = useState<Filter>('all')
   const [open, setOpen] = useState<string | null>(null)
   const startRun = useGame((s) => s.startRun)
@@ -55,6 +57,8 @@ export function TopicsPanel() {
           attempts: m.seen,
           correct: m.correct,
           unlocked: isSkillUnlocked(s.id, mastery),
+          lesson: hasLesson(s.id),
+          lessonRead: lessonsRead.includes(s.id),
         }
       })
       const total = skills.reduce((n, s) => n + s.total, 0)
@@ -73,8 +77,10 @@ export function TopicsPanel() {
     const seenQ = worlds.reduce((n, w) => n + w.seen, 0)
     const totalTopics = worlds.reduce((n, w) => n + w.skills.length, 0)
     const touchedTopics = worlds.reduce((n, w) => n + w.touched, 0)
-    return { worlds, totalQ, seenQ, totalTopics, touchedTopics }
-  }, [mastery, srs])
+    const lessonsAvailable = worlds.reduce((n, w) => n + w.skills.filter((s) => s.lesson).length, 0)
+    const lessonsDone = worlds.reduce((n, w) => n + w.skills.filter((s) => s.lessonRead).length, 0)
+    return { worlds, totalQ, seenQ, totalTopics, touchedTopics, lessonsAvailable, lessonsDone }
+  }, [mastery, srs, lessonsRead])
 
   const shown = report.worlds.filter((w) => filter === 'all' || w.world.focus === filter)
 
@@ -110,10 +116,22 @@ export function TopicsPanel() {
         </div>
         <Bar value={report.seenQ / Math.max(1, report.totalQ)} color="linear-gradient(90deg, var(--accent-2), var(--accent))" />
 
+        <div className="row between mt" style={{ gap: 10 }}>
+          <span className="tiny faint">
+            📖 Lessons read: <strong>{report.lessonsDone}</strong> / {report.lessonsAvailable}
+          </span>
+          <Bar
+            value={report.lessonsDone / Math.max(1, report.lessonsAvailable)}
+            thin
+            color="linear-gradient(90deg, #c58cff, #7c5cff)"
+            style={{ flex: 1, maxWidth: 180 }}
+          />
+        </div>
+
         {nextUp && (
           <div className="row between mt" style={{ gap: 10 }}>
             <div style={{ minWidth: 0 }}>
-              <div className="tiny faint">LEAST COVERED UNLOCKED TOPIC</div>
+              <div className="tiny faint">DO THIS NEXT</div>
               <div className="small bold">
                 {nextUp.world.icon} {nextUp.node.name}
                 <span className="faint" style={{ fontWeight: 500 }}>
@@ -121,15 +139,28 @@ export function TopicsPanel() {
                 </span>
               </div>
             </div>
-            <button
-              className="btn primary sm"
-              onClick={() => {
-                sfx.click()
-                startRun({ mode: 'practice', world: nextUp.world.id, skill: nextUp.node.id })
-              }}
-            >
-              Train it
-            </button>
+            {/* If there's a lesson they haven't read, reading beats drilling. */}
+            {nextUp.lesson && !nextUp.lessonRead ? (
+              <button
+                className="btn primary sm"
+                onClick={() => {
+                  sfx.click()
+                  onLearn(nextUp.node.id)
+                }}
+              >
+                📖 Learn it
+              </button>
+            ) : (
+              <button
+                className="btn primary sm"
+                onClick={() => {
+                  sfx.click()
+                  startRun({ mode: 'practice', world: nextUp.world.id, skill: nextUp.node.id })
+                }}
+              >
+                Train it
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -225,8 +256,22 @@ export function TopicsPanel() {
                         </div>
                         <div className="tiny faint">{Math.round(s.coverage * 100)}%</div>
                       </div>
+                      {s.lesson && (
+                        <button
+                          className="btn ghost sm"
+                          title={s.lessonRead ? 'Lesson read — re-read it' : 'Read the lesson'}
+                          style={{ opacity: s.lessonRead ? 0.55 : 1 }}
+                          onClick={() => {
+                            sfx.click()
+                            onLearn(s.node.id)
+                          }}
+                        >
+                          {s.lessonRead ? '✓📖' : '📖'}
+                        </button>
+                      )}
                       <button
                         className="btn ghost sm"
+                        title="Practise this topic"
                         disabled={!s.unlocked || s.total === 0}
                         onClick={() => {
                           sfx.click()
@@ -245,8 +290,8 @@ export function TopicsPanel() {
       })}
 
       <div className="tiny faint center mt">
-        {QUESTION_COUNT} questions across {WORLDS.length} worlds. A topic counts as "seen" once a question from it has
-        been served to you at least once.
+        {QUESTION_COUNT} questions and {LESSON_COUNT} lessons across {WORLDS.length} worlds. A topic counts as "seen"
+        once a question from it has been served to you at least once.
       </div>
     </>
   )

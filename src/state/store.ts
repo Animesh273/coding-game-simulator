@@ -37,6 +37,7 @@ import { newlyEarned, ACHIEVEMENT_BY_ID, TIER_XP, TIER_GEMS } from '../game/achi
 import { WORLDS, SKILL_BY_ID, UNLOCK_THRESHOLD } from '../content/worlds'
 import { COMPANY_BY_ID } from '../content/companies'
 import { ALL_QUESTIONS, QUESTION_BY_ID, questionsForWorld, questionsForSkill, questionsForWorlds } from '../content/questions'
+import { LESSON_XP, LESSON_GEMS } from '../content/lessons'
 
 /* ------------------------------------------------------------------ types */
 
@@ -118,6 +119,8 @@ export interface GameState {
   mastery: Record<string, Mastery>
   srs: Record<string, SrsCard>
   recent: boolean[]
+  /** Skill ids whose lesson has been read end-to-end. */
+  lessonsRead: string[]
 
   /* ---- meta ---- */
   streak: StreakState
@@ -134,6 +137,7 @@ export interface GameState {
   completeOnboarding: (name: string, base: string, color: string) => void
   tickDay: () => void
   claimLogin: () => void
+  completeLesson: (skillId: string) => void
   startRun: (opts: { mode: RunMode; world?: WorldId; skill?: string; companyId?: string }) => void
   submitAnswer: (chosen: number[]) => void
   nextQuestion: () => void
@@ -216,6 +220,7 @@ function freshState() {
     mastery: {} as Record<string, Mastery>,
     srs: {} as Record<string, SrsCard>,
     recent: [] as boolean[],
+    lessonsRead: [] as string[],
     streak: { count: 0, best: 0, lastActiveDay: '', todayXp: 0, loginClaimedDay: '' },
     quests: {
       dayKey: today,
@@ -323,6 +328,39 @@ export const useGame = create<GameState>()(
               icon: '🔥',
             },
           ],
+        })
+      },
+
+      /**
+       * Marks a lesson read. Pays out once — re-reading is encouraged and free,
+       * but it must not become an XP tap.
+       */
+      completeLesson: (skillId) => {
+        const s = get()
+        if (s.lessonsRead.includes(skillId)) return
+
+        const before = levelFromXp(s.totalXp).level
+        const totalXp = s.totalXp + LESSON_XP
+        const events: GameEvent[] = [
+          ...s.events,
+          { id: evId(), type: 'toast', label: `Lesson complete · +${LESSON_XP} XP`, icon: '📖' },
+        ]
+        const pendingChests = [...s.pendingChests]
+        if (levelFromXp(totalXp).level > before) {
+          events.push({ id: evId(), type: 'levelup', level: levelFromXp(totalXp).level })
+          pendingChests.push(rollChestRarity(s.streak.count))
+        }
+
+        set({
+          lessonsRead: [...s.lessonsRead, skillId],
+          totalXp,
+          gems: s.gems + LESSON_GEMS,
+          pendingChests,
+          events,
+          streak: (() => {
+            const bumped = bumpStreak(s.streak, dayKey())
+            return { ...bumped, todayXp: bumped.todayXp + LESSON_XP }
+          })(),
         })
       },
 

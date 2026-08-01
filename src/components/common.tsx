@@ -176,13 +176,16 @@ export function Empty({ icon, title, sub }: { icon: string; title: string; sub?:
 /* ------------------------------------------------------- markdown-lite -- */
 
 /**
- * Renders the small subset of markdown the mentor actually emits: **bold**,
- * `code`, _italics_. Deliberately not a full parser — pulling in a markdown
- * library for three inline forms would be the wrong trade.
+ * Renders the small subset of markdown the mentor and the lessons emit:
+ * **bold**, `code`, _italics_ and *italics*. Deliberately not a full parser —
+ * pulling in a markdown library for four inline forms would be the wrong trade.
+ *
+ * Alternation order matters: `**bold**` must be tried before `*italic*`, or a
+ * bold span would match as an italic containing a stray asterisk.
  */
 export function RichText({ text }: { text: string }) {
   const nodes: ReactNode[] = []
-  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|_[^_]+_)/g
+  const pattern = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`|_[^_\n]+_)/g
   let last = 0
   let match: RegExpExecArray | null
   let key = 0
@@ -192,7 +195,7 @@ export function RichText({ text }: { text: string }) {
     const token = match[0]
     if (token.startsWith('**')) nodes.push(<strong key={key++}>{token.slice(2, -2)}</strong>)
     else if (token.startsWith('`')) nodes.push(<code key={key++}>{token.slice(1, -1)}</code>)
-    else nodes.push(<em key={key++} style={{ opacity: 0.8 }}>{token.slice(1, -1)}</em>)
+    else nodes.push(<em key={key++} style={{ opacity: 0.85 }}>{token.slice(1, -1)}</em>)
     last = match.index + token.length
   }
   if (last < text.length) nodes.push(text.slice(last))

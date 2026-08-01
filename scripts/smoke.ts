@@ -85,6 +85,61 @@ async function main() {
   const emptySkills = Object.keys(SKILL_BY_ID).filter((id) => questionsForSkill(id).length === 0)
   check('every skill node has at least one question', emptySkills.length === 0, emptySkills)
 
+  const { ALL_LESSONS, LESSON_BY_SKILL, LESSON_COUNT } = await import('../src/content/lessons')
+
+  check(`${LESSON_COUNT} lessons written`, LESSON_COUNT >= 13, LESSON_COUNT)
+  check(
+    'every lesson maps to a real skill node',
+    ALL_LESSONS.every((l) => !!SKILL_BY_ID[l.skillId]),
+    ALL_LESSONS.filter((l) => !SKILL_BY_ID[l.skillId]).map((l) => l.skillId),
+  )
+  check(
+    'no duplicate lessons for one skill',
+    Object.keys(LESSON_BY_SKILL).length === ALL_LESSONS.length,
+  )
+  check(
+    'every lesson has sections, key points and an interview angle',
+    ALL_LESSONS.every((l) => l.sections.length >= 3 && l.keyPoints.length >= 3 && l.interviewAngle.length > 40),
+    ALL_LESSONS.filter((l) => l.sections.length < 3 || l.keyPoints.length < 3).map((l) => l.skillId),
+  )
+  check(
+    'every lesson section has a heading and a body',
+    ALL_LESSONS.every((l) => l.sections.every((s) => s.heading.length > 0 && s.body.length > 40)),
+  )
+  /*
+   * Inline-markup hazards. Identifiers like `unordered_map` are fine — they
+   * render literally, which is what we want. The real failure is *accidental*
+   * markup: two bare underscores on one line make RichText italicise everything
+   * between them, and an odd number of asterisks leaves one printed raw.
+   */
+  {
+    const stripCode = (t: string) => t.replace(/`[^`]*`/g, '')
+    const offenders: string[] = []
+    for (const l of ALL_LESSONS) {
+      const texts = [l.intro, l.interviewAngle, ...l.sections.map((s) => s.body), ...l.keyPoints]
+      for (const raw of texts) {
+        for (const line of stripCode(raw).split('\n')) {
+          if ((line.match(/_/g) ?? []).length >= 2) {
+            offenders.push(`${l.skillId} accidental italics: ${line.slice(0, 50)}`)
+          }
+          if ((line.match(/\*/g) ?? []).length % 2 !== 0) {
+            offenders.push(`${l.skillId} unbalanced *: ${line.slice(0, 50)}`)
+          }
+        }
+      }
+    }
+    check('lesson prose has no accidental italics or unbalanced emphasis', offenders.length === 0, offenders.slice(0, 4))
+  }
+  check(
+    'both language tracks are fully covered by lessons',
+    ['python', 'cpp'].every((w) =>
+      WORLDS.find((x) => x.id === w)!.skills.every((s) => !!LESSON_BY_SKILL[s.id]),
+    ),
+    ['python', 'cpp'].flatMap((w) =>
+      WORLDS.find((x) => x.id === w)!.skills.filter((s) => !LESSON_BY_SKILL[s.id]).map((s) => s.id),
+    ),
+  )
+
   check(
     'worlds are ordered by unlock level (playable content leads the map)',
     WORLDS.every((w, i) => i === 0 || WORLDS[i - 1].unlockLevel <= w.unlockLevel),
@@ -283,6 +338,22 @@ async function main() {
   const evTypes = new Set(g().events.map((e) => e.type))
   check('level-up event queued', evTypes.has('levelup'), [...evTypes])
   check('achievement events queued', g().achievements.length > 0, g().achievements)
+
+  // --- lessons pay out once ---
+  {
+    const xpBefore = g().totalXp
+    const gemsBefore = g().gems
+    g().completeLesson('py.basics')
+    check('completing a lesson grants xp', g().totalXp > xpBefore)
+    check('completing a lesson grants gems', g().gems > gemsBefore)
+    check('lesson is recorded as read', g().lessonsRead.includes('py.basics'))
+
+    const xpAfter = g().totalXp
+    const gemsAfter = g().gems
+    g().completeLesson('py.basics')
+    check('re-reading a lesson pays nothing', g().totalXp === xpAfter && g().gems === gemsAfter)
+    check('lesson is not recorded twice', g().lessonsRead.filter((s) => s === 'py.basics').length === 1)
+  }
 
   // --- chest opening ---
   const beforeChest = { gems: g().gems, chests: g().pendingChests.length }

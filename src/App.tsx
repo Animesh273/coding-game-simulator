@@ -5,6 +5,7 @@ import { Onboarding } from './screens/Onboarding'
 import { WorldMap } from './screens/WorldMap'
 import { WorldDetail } from './screens/WorldDetail'
 import { Battle } from './screens/Battle'
+import { Learn } from './screens/Learn'
 import { Quests } from './screens/Quests'
 import { Arena } from './screens/Arena'
 import { Mentor } from './screens/Mentor'
@@ -19,6 +20,7 @@ export default function App() {
 
   const [tab, setTab] = useState<Tab>('map')
   const [world, setWorld] = useState<WorldId | null>(null)
+  const [learning, setLearning] = useState<string | null>(null)
 
   /* Roll the calendar forward on mount and whenever the tab regains focus —
      a student who leaves the app open overnight should still see today's
@@ -51,11 +53,16 @@ export default function App() {
           onExit={() => {
             useGame.setState({ run: null })
             setWorld(null)
+            setLearning(null)
           }}
         />
+      ) : learning ? (
+        // A lesson takes over the whole screen wherever it was opened from,
+        // so it can be reached from the skill tree and the topics tracker alike.
+        <Learn skillId={learning} onExit={() => setLearning(null)} />
       ) : tab === 'map' ? (
         world ? (
-          <WorldDetail world={world} onBack={() => setWorld(null)} />
+          <WorldDetail world={world} onBack={() => setWorld(null)} onLearn={setLearning} />
         ) : (
           <WorldMap onEnterWorld={setWorld} />
         )
@@ -66,7 +73,7 @@ export default function App() {
       ) : tab === 'mentor' ? (
         <Mentor />
       ) : (
-        <Profile />
+        <Profile onLearn={setLearning} />
       )}
 
       <Nav
@@ -74,6 +81,7 @@ export default function App() {
         onTab={(t) => {
           setTab(t)
           setWorld(null)
+          setLearning(null)
         }}
       />
 
