@@ -1,0 +1,30 @@
+{
+  "name": "ascend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ASCEND — a gamified, AI-mentored placement preparation RPG for engineering students.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "smoke": "tsx scripts/smoke.ts",
+    "check": "tsc -b --noEmit && tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "framer-motion": "^11.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.23.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}
