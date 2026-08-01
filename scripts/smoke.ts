@@ -525,6 +525,60 @@ async function main() {
   }
   check('a fresh profile earns none', ACHIEVEMENTS.every((a) => !a.check(zero)))
 
+  /* =========================================================== save merge = */
+  section('Account sync — merge must never lose progress')
+
+  {
+    const { mergeSaves } = await import('../src/backend/sync')
+    const base = () => ({
+      name: '', avatar: { base: 'rookie', color: 'azure', aura: 'none', title: 'Aspirant' },
+      ownedCosmetics: [], unlockedTitles: [], createdAt: 2000, onboarded: true,
+      totalXp: 0, gems: 0, hints: 0, freezes: 0, pendingChests: [],
+      mastery: {}, srs: {}, recent: [], lessonsRead: [],
+      streak: { count: 0, best: 0, lastActiveDay: '', todayXp: 0, loginClaimedDay: '' },
+      quests: null, achievements: [], defeatedCompanies: [], stats: {},
+    })
+
+    const local = { ...base(), totalXp: 5000, gems: 300, achievements: ['a', 'b'], lessonsRead: ['py.basics'],
+      createdAt: 1000,
+      mastery: { 'py.basics': { theta: 3, seen: 20, correct: 15, hot: 2 } },
+      srs: { q1: { qid: 'q1', ease: 2.5, intervalDays: 3, dueAt: 500, lapses: 0, lastSeenAt: 900 } },
+      streak: { count: 9, best: 12, lastActiveDay: '2026-08-02', todayXp: 60, loginClaimedDay: '2026-08-02' },
+      stats: { totalAnswered: 200, bestCombo: 14 }, ownedCosmetics: ['ninja'] }
+
+    const remote = { ...base(), totalXp: 3000, gems: 800, achievements: ['b', 'c'], lessonsRead: ['cpp.basics'],
+      name: 'Aarav',
+      mastery: { 'py.basics': { theta: 2, seen: 5, correct: 3, hot: 0 } },
+      srs: { q1: { qid: 'q1', ease: 2.5, intervalDays: 1, dueAt: 100, lapses: 3, lastSeenAt: 100 } },
+      streak: { count: 4, best: 20, lastActiveDay: '2026-07-30', todayXp: 10, loginClaimedDay: '2026-07-30' },
+      stats: { totalAnswered: 90, perfectRuns: 4 }, ownedCosmetics: ['wizard'] }
+
+    const m = mergeSaves(local, remote)
+
+    check('merge keeps the higher xp', m.totalXp === 5000, m.totalXp)
+    check('merge keeps the higher gem balance', m.gems === 800, m.gems)
+    check('merge unions achievements', m.achievements.sort().join() === 'a,b,c', m.achievements)
+    check('merge unions lessons read', m.lessonsRead.length === 2, m.lessonsRead)
+    check('merge unions owned cosmetics', m.ownedCosmetics.sort().join() === 'ninja,wizard', m.ownedCosmetics)
+    check('merge keeps the better-evidenced mastery', m.mastery['py.basics'].seen === 20)
+    check('merge keeps the more recent srs card', m.srs.q1.lastSeenAt === 900)
+    check('merge keeps the longer current streak', m.streak.count === 9)
+    check('merge keeps the best-ever streak from either side', m.streak.best === 20)
+    check('merge takes the more recent active day', m.streak.lastActiveDay === '2026-08-02')
+    check('merge takes per-stat maxima across both sides', m.stats.totalAnswered === 200 && m.stats.perfectRuns === 4)
+    check('merge prefers the account display name', m.name === 'Aarav')
+    check('merge keeps the earliest created date', m.createdAt === 1000)
+
+    // Symmetry: the same two saves merged the other way must not lose anything.
+    const rev = mergeSaves(remote, local)
+    check('merge is symmetric for monotonic fields', rev.totalXp === 5000 && rev.gems === 800 && rev.streak.best === 20)
+    check('merge is symmetric for unions', rev.achievements.sort().join() === 'a,b,c')
+
+    // A brand-new account (empty remote) must not wipe a local grind.
+    const fresh = mergeSaves(local, base())
+    check('signing into an empty account preserves local progress', fresh.totalXp === 5000 && fresh.streak.count === 9)
+  }
+
   /* ================================================================= reset = */
   section('Reset')
 

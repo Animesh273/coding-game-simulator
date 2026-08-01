@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useGame } from './state/store'
+import { startSync } from './state/sync'
 import { TopBar, Nav, EventLayer, type Tab } from './components/Shell'
 import { Onboarding } from './screens/Onboarding'
 import { WorldMap } from './screens/WorldMap'
@@ -25,6 +26,12 @@ export default function App() {
   /* Roll the calendar forward on mount and whenever the tab regains focus —
      a student who leaves the app open overnight should still see today's
      quests and an intact (or correctly broken) streak. */
+  // Connects the local save to the account, if one is configured. Safe to call
+  // unconditionally — with no Supabase project it reports 'off' and no-ops.
+  useEffect(() => {
+    startSync()
+  }, [])
+
   useEffect(() => {
     tickDay()
     const onFocus = () => tickDay()

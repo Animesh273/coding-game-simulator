@@ -130,6 +130,33 @@ For deployment, set **Proxy base URL** in AI Settings to a small backend you con
 
 ---
 
+## Accounts & progress sync (optional)
+
+Without an account the game is entirely local — progress lives in that browser's `localStorage`. Connecting a Supabase project adds email/password sign-in and cross-device sync. **The app runs identically with no project connected**, so this is genuinely optional.
+
+### Setup
+
+1. **Create a project** at [supabase.com](https://supabase.com) (free tier is ample).
+2. **Run the schema.** Dashboard → SQL Editor → New query → paste [`supabase/schema.sql`](supabase/schema.sql) → Run. This creates `profiles` and `saves` and — importantly — the row-level security policies.
+3. **Copy the credentials.** Project Settings → API → *Project URL* and the **`anon` / public** key.
+4. **Add them as environment variables** in Vercel (Settings → Environment Variables), and locally in a `.env` file:
+
+   ```
+   VITE_SUPABASE_URL=https://xxxxx.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGci...
+   ```
+5. **Redeploy.** The account badge on the Profile screen becomes a sign-in.
+
+### Why the anon key is safe in the browser, and the AI key is not
+
+`VITE_` variables are inlined into the shipped JavaScript, so **the anon key is public**. That is how Supabase is designed: it identifies the project and nothing more, and every table is guarded by row-level security policies enforced by Postgres. A signed-in user can only read or write their own row no matter what the client asks for.
+
+That is the opposite of an Anthropic API key, which grants spend and must never reach the browser. Never put a Supabase **`service_role`** key in a `VITE_` variable either — that one bypasses RLS and is a real secret.
+
+### Merging, not overwriting
+
+Signing in **merges** the local save with the account rather than replacing it. Monotonic values take the maximum, collections take the union, per-skill mastery keeps whichever side has more attempts, and each revision card keeps its most recent review. Someone who grinds offline on a phone and then signs in on a laptop never watches a level disappear. Fifteen checks in the smoke suite pin this down, including symmetry and the empty-account case.
+
 ## Deploying
 
 Deployed on **Vercel**. It auto-detects Vite, so no `vercel.json` is needed:

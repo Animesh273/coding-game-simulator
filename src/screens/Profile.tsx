@@ -7,6 +7,7 @@ import { WORLDS } from '../content/worlds'
 import { QUESTION_COUNT } from '../content/questions'
 import { isSfxEnabled, setSfxEnabled, sfx } from '../lib/sfx'
 import { TopicsPanel } from './Topics'
+import { AccountModal, SyncBadge } from './Account'
 import { Avatar, Bar, Modal, CountUp } from '../components/common'
 import type { AvatarPart } from '../game/avatar'
 
@@ -14,10 +15,12 @@ type Panel = 'stats' | 'topics' | 'badges' | 'locker'
 
 export function Profile({ onLearn }: { onLearn: (skillId: string) => void }) {
   const [panel, setPanel] = useState<Panel>('stats')
+  const [account, setAccount] = useState(false)
 
   return (
     <div className="screen">
-      <Hero />
+      <Hero onOpenAccount={() => setAccount(true)} />
+      {account && <AccountModal onClose={() => setAccount(false)} />}
 
       <div className="row wrap mb" style={{ gap: 8 }}>
         {(
@@ -51,7 +54,7 @@ export function Profile({ onLearn }: { onLearn: (skillId: string) => void }) {
 
 /* ================================================================= hero === */
 
-function Hero() {
+function Hero({ onOpenAccount }: { onOpenAccount: () => void }) {
   const { name, avatar, totalXp, streak } = useGame()
   const { level, into, need } = levelFromXp(totalXp)
   const rank = rankFromLevel(level)
@@ -75,6 +78,9 @@ function Hero() {
           </div>
           <div className="tiny faint" style={{ marginTop: 3 }}>
             Level {level} · {totalXp.toLocaleString()} total XP · 🔥 {streak.count}-day streak
+          </div>
+          <div style={{ marginTop: 7 }}>
+            <SyncBadge onOpen={onOpenAccount} />
           </div>
         </div>
       </div>
