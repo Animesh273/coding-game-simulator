@@ -1,5 +1,5 @@
 import type { Question, ChatTurn } from '../game/types'
-import { isAiConfigured, streamReply, AiError } from './client'
+import { isAiAvailable, streamReply, AiError } from './client'
 import {
   mentorSystemPrompt,
   explainPrompt,
@@ -55,10 +55,11 @@ async function* withFallback(
   live: () => AsyncGenerator<string>,
   offline: () => string,
 ): AsyncGenerator<string> {
-  if (!isAiConfigured()) {
+  if (!(await isAiAvailable())) {
     yield* typeOut(offline())
     return
   }
+
   let emitted = false
   try {
     for await (const chunk of live()) {
@@ -72,6 +73,17 @@ async function* withFallback(
       yield '\n\n_(connection dropped mid-answer)_'
       return
     }
+
+    const kind = err instanceof AiError ? err.kind : 'unknown'
+
+    // A shared free-tier key running out of quota is an expected, routine
+    // condition — not an error the student can act on. Hand straight to the
+    // authored coach without leading with a failure message.
+    if (kind === 'rate' || kind === 'not_configured') {
+      yield* typeOut(offline())
+      return
+    }
+
     const msg = err instanceof AiError ? err.message : 'Mentor unreachable.'
     yield* typeOut(`_${msg} Falling back to the built-in coach._\n\n${offline()}`)
   }
@@ -92,7 +104,7 @@ export function streamFeedback(
       streamReply({
         system: mentorSystemPrompt(confidence),
         messages: [{ role: 'user', content: explainPrompt(q, chosen, correct) }],
-        effort: 'low',
+        tier: 'fast',
         maxTokens: 600,
         signal,
       }),
@@ -106,7 +118,7 @@ export function streamHint(q: Question, signal?: AbortSignal): AsyncGenerator<st
       streamReply({
         system: mentorSystemPrompt('low'),
         messages: [{ role: 'user', content: hintPrompt(q) }],
-        effort: 'low',
+        tier: 'fast',
         maxTokens: 250,
         signal,
       }),
@@ -129,7 +141,7 @@ export function streamDebrief(summary: DebriefSummary, signal?: AbortSignal): As
       streamReply({
         system: mentorSystemPrompt(summary.correct / Math.max(1, summary.answered) >= 0.7 ? 'high' : 'low'),
         messages: [{ role: 'user', content: debriefPrompt(summary) }],
-        effort: 'medium',
+        tier: 'quality',
         maxTokens: 700,
         signal,
       }),
@@ -150,7 +162,7 @@ export function streamChat(
       streamReply({
         system: mentorSystemPrompt(confidence),
         messages: history,
-        effort: 'medium',
+        tier: 'quality',
         maxTokens: 1200,
         signal,
       }),
@@ -175,7 +187,7 @@ export function streamInterviewOpener(
       streamReply({
         system: interviewerSystemPrompt(company, persona),
         messages: [{ role: 'user', content: interviewOpener(company, focus) }],
-        effort: 'medium',
+        tier: 'quality',
         maxTokens: 400,
         signal,
       }),
@@ -209,7 +221,7 @@ export function streamInterviewTurn(
             }.`,
           },
         ],
-        effort: 'medium',
+        tier: 'quality',
         maxTokens: 400,
         signal,
       }),
@@ -230,7 +242,7 @@ export function streamVerdict(
       streamReply({
         system: interviewerSystemPrompt(company, persona),
         messages: [{ role: 'user', content: interviewVerdictPrompt(score, total, transcript) }],
-        effort: 'medium',
+        tier: 'quality',
         maxTokens: 700,
         signal,
       }),

@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Supabase client.
@@ -37,9 +37,18 @@ export function isBackendConfigured(): boolean {
   return Boolean(URL_ENV && KEY_ENV)
 }
 
-export function supabase(): SupabaseClient | null {
+/**
+ * Loads the Supabase SDK on demand.
+ *
+ * The import is dynamic so the ~120 kB client is only downloaded by
+ * deployments that actually configured a project — a fork with no backend
+ * never pays for it. `isBackendConfigured()` above is a plain env read and
+ * stays synchronous, so the UI can branch without awaiting anything.
+ */
+export async function supabase(): Promise<SupabaseClient | null> {
   if (!isBackendConfigured()) return null
   if (!client) {
+    const { createClient } = await import('@supabase/supabase-js')
     client = createClient(URL_ENV!, KEY_ENV!, {
       auth: {
         persistSession: true,

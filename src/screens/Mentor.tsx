@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../state/store'
 import { streamChat, confidenceFrom } from '../ai/mentor'
-import { getApiKey, setApiKey, getProxyUrl, setProxyUrl, isAiConfigured, MODEL } from '../ai/client'
+import {
+  getGroqKey,
+  setGroqKey,
+  getAnthropicKey,
+  setAnthropicKey,
+  getPreferredProvider,
+  setPreferredProvider,
+  resolveProvider,
+  probeServer,
+  PROVIDER_LABEL,
+  type Provider,
+} from '../ai/client'
 import { Modal, RichText, useStream } from '../components/common'
 import { sfx } from '../lib/sfx'
 import type { ChatTurn } from '../game/types'
@@ -22,7 +33,11 @@ export function Mentor() {
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [draft, setDraft] = useState('')
   const [settings, setSettings] = useState(false)
-  const [configured, setConfigured] = useState(isAiConfigured())
+  const [active, setActive] = useState<Provider>('offline')
+
+  useEffect(() => {
+    void resolveProvider().then(setActive)
+  }, [settings])
   const stream = useStream()
   const logRef = useRef<HTMLDivElement>(null)
 
@@ -62,7 +77,9 @@ export function Mentor() {
             ARIA
           </h2>
           <p className="screen-sub" style={{ marginBottom: 0 }}>
-            {configured ? `Powered by ${MODEL}` : 'Offline coach — add a key for full conversations'}
+            {active === 'offline'
+              ? 'Built-in coach — connect a provider for full conversations'
+              : PROVIDER_LABEL[active]}
           </p>
         </div>
         <button className="btn ghost sm" onClick={() => setSettings(true)}>
@@ -125,28 +142,41 @@ export function Mentor() {
         </button>
       </div>
 
-      {settings && (
-        <AiSettings
-          onClose={() => {
-            setConfigured(isAiConfigured())
-            setSettings(false)
-          }}
-        />
-      )}
+      {settings && <AiSettings onClose={() => setSettings(false)} />}
     </div>
   )
 }
 
 /* ============================================================= settings === */
 
+const PROVIDERS: { id: Provider | 'auto'; label: string; hint: string }[] = [
+  { id: 'auto', label: 'Automatic', hint: 'Use this site’s AI if available, then your own key' },
+  { id: 'server', label: 'This site', hint: 'No key needed — shared, so it can be busy' },
+  { id: 'groq', label: 'Groq', hint: 'Your own key — free tier, very fast' },
+  { id: 'anthropic', label: 'Anthropic', hint: 'Your own key — highest quality, paid' },
+  { id: 'offline', label: 'Built-in coach', hint: 'No AI at all — authored explanations only' },
+]
+
 function AiSettings({ onClose }: { onClose: () => void }) {
-  const [key, setKey] = useState(getApiKey())
-  const [proxy, setProxy] = useState(getProxyUrl())
+  const [groq, setGroq] = useState(getGroqKey())
+  const [anthropic, setAnthropic] = useState(getAnthropicKey())
+  const [choice, setChoice] = useState<Provider | 'auto'>(getPreferredProvider())
   const [reveal, setReveal] = useState(false)
+  const [server, setServer] = useState<{ available: boolean; provider: string | null } | null>(null)
+  const [active, setActive] = useState<Provider>('offline')
+
+  useEffect(() => {
+    void probeServer().then(setServer)
+  }, [])
+
+  useEffect(() => {
+    void resolveProvider().then(setActive)
+  }, [choice, groq, anthropic])
 
   function save() {
-    setApiKey(key)
-    setProxyUrl(proxy)
+    setGroqKey(groq)
+    setAnthropicKey(anthropic)
+    setPreferredProvider(choice)
     sfx.unlock()
     onClose()
   }
@@ -157,26 +187,69 @@ function AiSettings({ onClose }: { onClose: () => void }) {
         AI Settings
       </div>
       <p className="small dim">
-        ASCEND is fully playable without this. Every question ships with a written explanation and the built-in coach
-        handles feedback and debriefs. A key upgrades ARIA into a real conversational mentor and interviewer.
+        ASCEND is fully playable without any of this. Every question ships with a written explanation and the
+        built-in coach handles feedback and debriefs. A provider upgrades ARIA into a real conversational mentor.
       </p>
 
-      <div className="warn mb">
-        <strong>Read before pasting a key.</strong> This app calls the Anthropic API directly from your browser, so
-        the key is stored in this browser's localStorage and is visible to anyone with access to this device or its
-        devtools. That's fine for running ASCEND locally with your own key. Do <em>not</em> ship a build with a key
-        embedded, and do not use an organisation key you wouldn't want exposed. For a shared deployment, use the proxy
-        field below instead.
+      {/* ------------------------------------------------------- provider */}
+      <label className="label">Provider</label>
+      <div className="grid" style={{ gap: 7, marginBottom: 14 }}>
+        {PROVIDERS.map((p) => {
+          const unavailable =
+            (p.id === 'server' && server !== null && !server.available) ||
+            (p.id === 'groq' && !groq.trim()) ||
+            (p.id === 'anthropic' && !anthropic.trim())
+          return (
+            <button
+              key={p.id}
+              className="row"
+              style={{
+                gap: 11,
+                padding: '11px 13px',
+                borderRadius: 'var(--r-sm)',
+                textAlign: 'left',
+                border: `1.5px solid ${choice === p.id ? 'var(--accent)' : 'var(--line)'}`,
+                background: choice === p.id ? 'rgba(124,92,255,.14)' : 'var(--surface)',
+                opacity: unavailable && choice !== p.id ? 0.5 : 1,
+              }}
+              onClick={() => {
+                sfx.click()
+                setChoice(p.id)
+              }}
+            >
+              <span style={{ fontSize: 15 }}>{choice === p.id ? '◉' : '○'}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="small bold">{p.label}</span>
+                <span className="tiny faint" style={{ display: 'block' }}>
+                  {p.hint}
+                  {unavailable ? ' — not set up yet' : ''}
+                </span>
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      <label className="label">Anthropic API key</label>
+      <div className="card tight mb" style={{ textAlign: 'left' }}>
+        <div className="tiny faint mb">CURRENTLY ANSWERING</div>
+        <div className="small bold">{PROVIDER_LABEL[active]}</div>
+        {server?.available && (
+          <div className="tiny faint mt">
+            This deployment has a server-side key ({server.provider}), so visitors need none of their own. It is
+            shared, so it can hit a rate limit — the built-in coach takes over when it does.
+          </div>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------------ keys */}
+      <label className="label">Groq API key (optional)</label>
       <div className="row mb" style={{ gap: 8 }}>
         <input
           className="field"
           type={reveal ? 'text' : 'password'}
-          value={key}
-          placeholder="sk-ant-…"
-          onChange={(e) => setKey(e.target.value)}
+          value={groq}
+          placeholder="gsk_..."
+          onChange={(e) => setGroq(e.target.value)}
           autoComplete="off"
           spellCheck={false}
         />
@@ -184,26 +257,25 @@ function AiSettings({ onClose }: { onClose: () => void }) {
           {reveal ? '🙈' : '👁️'}
         </button>
       </div>
-
-      <label className="label">Proxy base URL (optional, recommended for deployment)</label>
-      <input
-        className="field mb"
-        value={proxy}
-        placeholder="https://your-backend.example.com/anthropic"
-        onChange={(e) => setProxy(e.target.value)}
-        spellCheck={false}
-      />
-      <p className="tiny faint">
-        Point this at a small backend that holds the key server-side and forwards to <code>api.anthropic.com</code>.
-        When set, the key field can be left empty.
+      <p className="tiny faint" style={{ marginTop: -8, marginBottom: 12 }}>
+        Free at console.groq.com — no card required. Fast, and good enough for coaching.
       </p>
 
-      <div className="card tight mt mb" style={{ textAlign: 'left' }}>
-        <div className="tiny faint mb">MODEL</div>
-        <div className="small mono">{MODEL}</div>
-        <div className="tiny faint mt">
-          Adaptive thinking at low effort for quick coaching, medium for interviews and debriefs.
-        </div>
+      <label className="label">Anthropic API key (optional)</label>
+      <input
+        className="field mb"
+        type={reveal ? 'text' : 'password'}
+        value={anthropic}
+        placeholder="sk-ant-..."
+        onChange={(e) => setAnthropic(e.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+      />
+
+      <div className="warn mb">
+        <strong>Keys you paste here stay in this browser.</strong> They are never sent anywhere except directly to
+        that provider, and never to this site’s server. But they are readable by anyone with devtools access on
+        this machine, so use a key you would be comfortable rotating.
       </div>
 
       <div className="row" style={{ gap: 10 }}>

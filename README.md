@@ -119,14 +119,35 @@ Technically: Claude **`claude-opus-5`** via `client.beta.messages.stream()`, wit
 
 **Without a key**, `offline.ts` composes coaching from each question's own teaching metadata plus your current state, typed out word-by-word through the identical code path. Components never know which one answered.
 
-### ⚠️ API key security
+### Providers
 
-ASCEND calls the Anthropic API **directly from the browser**, which needs `dangerouslyAllowBrowser` and means the key is visible to anyone with devtools access on that machine.
+Four modes, resolved automatically in this order:
 
-- **Fine:** you, running ASCEND locally, with your own key. It never leaves your browser's localStorage.
-- **Not fine:** a deployed multi-user build with a key baked in.
+| Mode | Key lives | Notes |
+|---|---|---|
+| **This site** | Server-side env var | Visitors need no key. Preferred when configured. |
+| **Groq** | Visitor's browser | Free tier, very fast. `llama-3.3-70b-versatile` / `llama-3.1-8b-instant`. |
+| **Anthropic** | Visitor's browser | `claude-opus-5`. Highest quality, paid. |
+| **Built-in coach** | — | No AI. Authored explanations. Always the floor. |
 
-For deployment, set **Proxy base URL** in AI Settings to a small backend you control that holds the key server-side; the SDK routes through it via `baseURL` and the key field can be left empty.
+### Server-side AI (`api/chat.ts`)
+
+Set **one** of these in Vercel → Settings → Environment Variables and redeploy:
+
+```
+GROQ_API_KEY=gsk_...        # recommended — free tier, no card
+ANTHROPIC_API_KEY=sk-ant-... # higher quality, paid per token
+```
+
+These are **not** `VITE_` prefixed, so they stay on the server and never reach the bundle. That is the whole point: it is the only way a static site can offer AI without shipping a spendable credential.
+
+The function normalises Groq's OpenAI-style SSE and Anthropic's event stream into one plain-text stream, so the browser parses neither dialect and swapping providers needs no client change.
+
+**Groq's free tier is 30 req/min, 6,000 tokens/min, 14,400/day — measured per *organisation*, not per user.** At roughly 800 tokens per mentor reply that is about seven replies a minute shared across every visitor. Fine for a class; not fine for a public link. The client treats a 429 as routine rather than an error and hands straight to the built-in coach, so the game never shows a failure the student can do nothing about.
+
+### Keys pasted by a visitor
+
+Stored in that browser's `localStorage` and sent only to the provider, never to this site's server. Still readable by anyone with devtools on that machine — fine for your own key, not for a shared one. The server-side option above exists precisely so visitors never need to paste anything.
 
 ---
 

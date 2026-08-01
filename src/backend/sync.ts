@@ -120,7 +120,7 @@ export function mergeSaves(local: SaveData, remote: SaveData): SaveData {
 export class SyncError extends Error {}
 
 export async function loadRemote(userId: string): Promise<SaveData | null> {
-  const c = supabase()
+  const c = await supabase()
   if (!c) return null
   const { data, error } = await c.from('saves').select('data, save_version').eq('user_id', userId).maybeSingle()
   if (error) throw new SyncError(error.message)
@@ -129,7 +129,7 @@ export async function loadRemote(userId: string): Promise<SaveData | null> {
 }
 
 export async function saveRemote(userId: string, save: SaveData): Promise<void> {
-  const c = supabase()
+  const c = await supabase()
   if (!c) return
   const { level } = levelFromXp(save.totalXp)
   const { error } = await c.from('saves').upsert(
@@ -149,14 +149,14 @@ export async function saveRemote(userId: string, save: SaveData): Promise<void> 
 }
 
 export async function loadProfile(userId: string): Promise<{ displayName: string | null; cohortCode: string | null }> {
-  const c = supabase()
+  const c = await supabase()
   if (!c) return { displayName: null, cohortCode: null }
   const { data } = await c.from('profiles').select('display_name, cohort_code').eq('id', userId).maybeSingle()
   return { displayName: data?.display_name ?? null, cohortCode: data?.cohort_code ?? null }
 }
 
 export async function setCohortCode(userId: string, code: string | null): Promise<void> {
-  const c = supabase()
+  const c = await supabase()
   if (!c) return
   const { error } = await c.from('profiles').update({ cohort_code: code }).eq('id', userId)
   if (error) throw new SyncError(error.message)
