@@ -1,10 +1,17 @@
 node_modules
 dist
-.env
-.env.*
+
+# Local secrets. `.env.local` is written by `vercel link` and holds real
+# credentials — it must never be committed. The example file is the one
+# exception and is listed after the wildcard so the negation actually wins.
+.env*
 !.env.example
+
 *.log
 .DS_Store
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Vercel CLI project link
+.vercel
