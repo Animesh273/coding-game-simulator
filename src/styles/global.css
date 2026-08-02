@@ -203,7 +203,24 @@ button:disabled { cursor: not-allowed; }
   position: relative;
   transition: color .2s;
 }
-.nav button span.i { font-size: 20px; line-height: 1; transition: transform .3s var(--ease-bounce); }
+/* Icons are now inline SVG rather than emoji, so the box needs explicit
+   dimensions — an <svg> has no font-size to lay it out. */
+.nav button span.i {
+  display: grid;
+  place-items: center;
+  width: 24px; height: 24px;
+  transition: transform .3s var(--ease-bounce);
+}
+.nav button span.i svg { display: block; overflow: visible; }
+
+/* SVG children rotate around the canvas corner by default, which throws the
+   glyph off-screen. `transform-box: fill-box` scopes the origin to the
+   element's own bounding box so `transform-origin: center` means what it
+   looks like it means. */
+.spin-origin {
+  transform-box: fill-box;
+  transform-origin: center;
+}
 .nav button:hover { color: var(--text-dim); }
 .nav button.on { color: var(--text); }
 .nav button.on span.i { transform: translateY(-2px) scale(1.14); }

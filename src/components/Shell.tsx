@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ForwardRefExoticComponent, RefAttributes } from 'react'
+import { CompassIcon, ScrollIcon, SwordsIcon, SparkleIcon, AvatarIcon } from './icons/NavIcons'
+import type { AnimatedIconHandle, AnimatedIconProps } from './icons/types'
 import { useGame, DAILY_GOAL_XP, type GameEvent } from '../state/store'
 import { levelFromXp, rankFromLevel, CHEST_LABEL, CHEST_COLOR } from '../game/progression'
 import { claimableCount } from '../game/quests'
@@ -74,13 +77,58 @@ export function TopBar({ onOpenChests }: { onOpenChests: () => void }) {
 
 /* ================================================================= nav === */
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
-  { id: 'map', icon: '🗺️', label: 'Worlds' },
-  { id: 'quests', icon: '📜', label: 'Quests' },
-  { id: 'arena', icon: '⚔️', label: 'Arena' },
-  { id: 'mentor', icon: '✨', label: 'Mentor' },
-  { id: 'profile', icon: '🧑‍🚀', label: 'Profile' },
+const TABS: { id: Tab; Icon: AnimatedIcon; label: string }[] = [
+  { id: 'map', Icon: CompassIcon, label: 'Worlds' },
+  { id: 'quests', Icon: ScrollIcon, label: 'Quests' },
+  { id: 'arena', Icon: SwordsIcon, label: 'Arena' },
+  { id: 'mentor', Icon: SparkleIcon, label: 'Mentor' },
+  { id: 'profile', Icon: AvatarIcon, label: 'Profile' },
 ]
+
+type AnimatedIcon = ForwardRefExoticComponent<AnimatedIconProps & RefAttributes<AnimatedIconHandle>>
+
+/**
+ * One nav button. Owns a ref to its icon so the animation can be fired from
+ * two different events — pointer hover, and the tab *becoming* active — which
+ * a CSS `:hover` rule could not cover on its own. Keyboard and programmatic
+ * navigation therefore animate exactly like a mouse does.
+ */
+function NavButton({
+  tab,
+  active,
+  badge,
+  onSelect,
+}: {
+  tab: (typeof TABS)[number]
+  active: boolean
+  badge: number
+  onSelect: () => void
+}) {
+  const icon = useRef<AnimatedIconHandle>(null)
+  const wasActive = useRef(active)
+
+  useEffect(() => {
+    if (active && !wasActive.current) icon.current?.startAnimation()
+    wasActive.current = active
+  }, [active])
+
+  const { Icon } = tab
+  return (
+    <button
+      className={active ? 'on' : ''}
+      onClick={onSelect}
+      onPointerEnter={() => icon.current?.startAnimation()}
+      onFocus={() => icon.current?.startAnimation()}
+      aria-current={active ? 'page' : undefined}
+    >
+      <span className="i">
+        <Icon ref={icon} size={22} />
+      </span>
+      {tab.label}
+      {badge > 0 && <span className="badge">{badge > 99 ? '99+' : badge}</span>}
+    </button>
+  )
+}
 
 export function Nav({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const quests = useGame((s) => s.quests)
@@ -90,23 +138,18 @@ export function Nav({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 
   return (
     <nav className="nav">
-      {TABS.map((t) => {
-        const badge = t.id === 'quests' ? claimable : t.id === 'arena' ? due : 0
-        return (
-          <button
-            key={t.id}
-            className={tab === t.id ? 'on' : ''}
-            onClick={() => {
-              sfx.click()
-              onTab(t.id)
-            }}
-          >
-            <span className="i">{t.icon}</span>
-            {t.label}
-            {badge > 0 && <span className="badge">{badge > 99 ? '99+' : badge}</span>}
-          </button>
-        )
-      })}
+      {TABS.map((t) => (
+        <NavButton
+          key={t.id}
+          tab={t}
+          active={tab === t.id}
+          badge={t.id === 'quests' ? claimable : t.id === 'arena' ? due : 0}
+          onSelect={() => {
+            sfx.click()
+            onTab(t.id)
+          }}
+        />
+      ))}
     </nav>
   )
 }
