@@ -1,0 +1,27 @@
+{
+  // Serverless functions are a separate compilation unit from the browser app.
+  //
+  // They run on Vercel's edge runtime: web-standard APIs (Request, Response,
+  // ReadableStream) plus `process.env`. Keeping this config separate from the
+  // main one means `process` and other Node globals stay OUT of scope in
+  // src/, so browser code cannot accidentally reach for them and only fail at
+  // runtime.
+  //
+  // This file exists because `api/` was previously outside tsconfig.json's
+  // `include`, so `npm run check` passed while Vercel's build reported six
+  // type errors in it. `npm run check` now compiles both.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["api"]
+}

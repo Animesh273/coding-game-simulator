@@ -1,5 +1,12 @@
+/// <reference types="node" />
 /**
  * Serverless AI proxy.
+ *
+ * The triple-slash reference above is load-bearing: Vercel typechecks this
+ * folder with its own configuration, not the project's, so the file has to
+ * declare its own need for Node globals (`process.env`) rather than rely on
+ * tsconfig.api.json being picked up. Without it the build reports six
+ * "Cannot find name 'process'" errors.
  *
  * Holds the API key **server-side** so visitors get the mentor without one of
  * their own. This is the only way a static site can offer AI without shipping
